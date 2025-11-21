@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vesper's Hollow: Chapter I</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-color: #050508;
+            --ui-bg: rgba(20, 18, 25, 0.95);
+            --ui-border: #444;
+            --text-main: #d0d0d0;
+            --accent-gold: #c5a059;
+            --accent-magic: #9b59b6;
+            --accent-danger: #c0392b;
+            --accent-umbra: #8e44ad;
+            --accent-lycoris: #27ae60;
+            --font-header: 'Cinzel', serif;
+            --font-body: 'Lato', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 1600px;
+            max-height: 900px;
+            box-shadow: 0 0 100px rgba(0,0,0,0.8);
+            background: #000;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* --- UI LAYER --- */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* 1. TOP HUD */
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+        }
+
+        .party-frames {
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+
+        .char-frame {
+            width: 240px;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid var(--ui-border);
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .char-frame.active {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 15px rgba(197, 160, 89, 0.2);
+            background: rgba(40, 35, 20, 0.6);
+        }
+
+        .char-portrait {
+            width: 50px;
+            height: 50px;
+            background: #111;
+            border: 1px solid #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+        }
+
+        .char-details { flex: 1; }
+        .char-name { font-family: var(--font-header); font-weight: bold; color: var(--accent-gold); font-size: 14px; }
+        .bar-container { width: 100%; height: 6px; background: #333; margin-top: 4px; position: relative; }
+        .hp-fill { height: 100%; background: var(--accent-danger); width: 100%; transition: width 0.3s; }
+        .ap-pips { display: flex; gap: 3px; margin-top: 4px; }
+        .ap-pip { width: 8px; height: 8px; background: #333; border-radius: 50%; }
+        .ap-pip.filled { background: var(--accent-magic); box-shadow: 0 0 5px var(--accent-magic); }
+
+        /* 2. DIALOGUE BOX */
+        #dialogue-box {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            background: var(--ui-bg);
+            border: 2px solid var(--accent-gold);
+            padding: 20px;
+            pointer-events: auto;
+            display: none; /* Hidden by default */
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        .speaker-name {
+            font-family: var(--font-header);
+            color: var(--accent-gold);
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .dialogue-text {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            min-height: 60px;
+        }
+
+        .dialogue-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .dialogue-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #444;
+            color: #ccc;
+            padding: 10px 15px;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.2s;
+            font-family: var(--font-body);
+        }
+
+        .dialogue-btn:hover {
+            border-color: var(--accent-gold);
+            background: rgba(197, 160, 89, 0.1);
+            color: #fff;
+        }
+
+        .tag-umbra { color: var(--accent-umbra); font-weight: bold; font-size: 12px; margin-right: 5px; }
+        .tag-lycoris { color: var(--accent-lycoris); font-weight: bold; font-size: 12px; margin-right: 5px; }
+        .tag-skill { color: var(--accent-magic); font-weight: bold; font-size: 12px; margin-right: 5px; }
+
+        /* 3. ACTION BAR */
+        .action-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-radius: 50px;
+            border: 1px solid #333;
+        }
+
+        .skill-btn {
+            width: 64px;
+            height: 64px;
+            background: #222;
+            border: 2px solid #555;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            cursor: pointer;
+            position: relative;
+            transition: 0.2s;
+        }
+
+        .skill-btn:hover { border-color: var(--accent-gold); transform: translateY(-5px); }
+        .skill-btn.active { border-color: var(--accent-magic); background: #321c3b; box-shadow: 0 0 20px var(--accent-magic); }
+        .skill-btn.disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(100%); }
+
+        .key-hint {
+            position: absolute;
+            top: -10px;
+            right: -5px;
+            background: #000;
+            border: 1px solid #555;
+            color: #aaa;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 4. OVERLAYS (Start/End) */
+        .fullscreen-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-color);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            transition: opacity 1s;
+        }
+
+        .creation-container {
+            width: 800px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            background: var(--ui-bg);
+            padding: 40px;
+            border: 2px solid var(--accent-gold);
+            box-shadow: 0 0 100px rgba(197, 160, 89, 0.1);
+        }
+
+        .creation-left h1 { font-family: var(--font-header); font-size: 3em; color: var(--accent-gold); margin: 0 0 10px 0; }
+        .creation-left p { color: #888; margin-bottom: 30px; font-style: italic; }
+        
+        .race-btn {
+            width: 100%;
+            padding: 15px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #444;
+            color: #aaa;
+            margin-bottom: 10px;
+            cursor: pointer;
+            text-align: left;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .race-btn:hover, .race-btn.selected {
+            border-color: var(--accent-gold);
+            background: rgba(197, 160, 89, 0.1);
+            color: #fff;
+        }
+
+        .race-icon { font-size: 24px; }
+
+        .creation-right {
+            border-left: 1px solid #444;
+            padding-left: 40px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #lore-preview { flex: 1; margin-top: 20px; line-height: 1.6; color: #ccc; }
+        
+        .start-btn {
+            background: transparent;
+            border: 2px solid var(--accent-gold);
+            color: var(--accent-gold);
+            padding: 15px;
+            font-family: var(--font-header);
+            font-size: 1.2em;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: auto;
+            transition: 0.2s;
+        }
+
+        .start-btn:hover { background: var(--accent-gold); color: #000; }
+
+        .hidden { opacity: 0; pointer-events: none; }
+        .gone { display: none !important; }
+
+        /* Combat Log */
+        #combat-log {
+            position: absolute;
+            bottom: 120px;
+            left: 20px;
+            width: 300px;
+            height: 200px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #444;
+            padding: 10px;
+            font-size: 13px;
+            pointer-events: none;
+            mask-image: linear-gradient(to bottom, transparent, black 10%);
+        }
+        .log-msg { margin-bottom: 4px; text-shadow: 1px 1px 0 #000; }
+        .log-turn { color: var(--accent-gold); font-weight: bold; margin-top: 10px; border-bottom: 1px solid #444; }
+
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <canvas id="canvas"></canvas>
+
+    <!-- CHARACTER CREATION -->
+    <div id="screen-creation" class="fullscreen-overlay">
+        <div class="creation-container">
+            <div class="creation-left">
+                <h1>Vesper's Hollow</h1>
+                <p>Chapter I: The Crossing</p>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display:block; color: var(--accent-gold); margin-bottom: 5px;">True Name</label>
+                    <input type="text" id="inp-name" value="Guest" style="width: 100%; padding: 10px; background: #111; border: 1px solid #444; color: white;">
+                </div>
+
+                <label style="display:block; color: var(--accent-gold); margin-bottom: 10px;">Select Lineage</label>
+                
+                <div class="race-btn selected" onclick="selectLineage('Umbra')">
+                    <span class="race-icon">🦇</span>
+                    <div>
+                        <div style="font-weight:bold;">Umbra</div>
+                        <div style="font-size: 12px;">Vampiric Heritage</div>
+                    </div>
+                </div>
+                <div class="race-btn" onclick="selectLineage('Lycoris')">
+                    <span class="race-icon">🐺</span>
+                    <div>
+                        <div style="font-weight:bold;">Lycoris</div>
+                        <div style="font-size: 12px;">Shifter Heritage</div>
+                    </div>
+                </div>
+                <div class="race-btn" onclick="selectLineage('Sirenia')">
+                    <span class="race-icon">🧜‍♀️</span>
+                    <div>
+                        <div style="font-weight:bold;">Sirenia</div>
+                        <div style="font-size: 12px;">Aquatic Heritage</div>
+                    </div>
+                </div>
+                <div class="race-btn" onclick="selectLineage('Oracle')">
+                    <span class="race-icon">👁️</span>
+                    <div>
+                        <div style="font-weight:bold;">Oracle</div>
+                        <div style="font-size: 12px;">Psychic Heritage</div>
+                    </div>
+                </div>
+                <div class="race-btn" onclick="selectLineage('Bound')">
+                    <span class="race-icon">⛓️</span>
+                    <div>
+                        <div style="font-weight:bold;">Bound</div>
+                        <div style="font-size: 12px;">Reanimated Heritage</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="creation-right">
+                <h3 id="lore-title" style="color: var(--accent-gold); font-family: var(--font-header);">The Umbra</h3>
+                <div id="lore-preview">
+                    Aristocratic and timeless. The Umbra feed on energy and blood, though the Academy provides substitutes. 
+                    <br><br>
+                    <strong>Passive:</strong> Night Vision + Diplomacy<br>
+                    <strong>Ability:</strong> <em>Sanguine Step</em> (Teleport)
+                </div>
+                <button class="start-btn" onclick="startGame()">Enter The Mist</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN UI -->
+    <div id="ui-layer" class="hidden">
+        
+        <!-- Top HUD -->
+        <div class="hud-top">
+            <div class="party-frames" id="party-frames">
+                <!-- Generated via JS -->
+            </div>
+            <div style="text-align: right;">
+                <div style="font-family: var(--font-header); color: #888; font-size: 14px;">LOCATION</div>
+                <div style="font-family: var(--font-header); color: var(--accent-gold); font-size: 24px;" id="location-text">The Ferry Docks</div>
+            </div>
+        </div>
+
+        <!-- Combat Log -->
+        <div id="combat-log"></div>
+
+        <!-- Dialogue Box -->
+        <div id="dialogue-box">
+            <div class="speaker-name" id="diag-speaker">Charon</div>
+            <div class="dialogue-text" id="diag-text">...</div>
+            <div class="dialogue-options" id="diag-options">
+                <!-- Options JS -->
+            </div>
+        </div>
+
+        <!-- Action Bar -->
+        <div class="action-bar">
+            <div class="skill-btn active" id="btn-move" onclick="Engine.setMode('move')">
+                👣 <div class="key-hint">1</div>
+            </div>
+            <div class="skill-btn" id="btn-attack" onclick="Engine.setMode('attack')">
+                ⚔️ <div class="key-hint">2</div>
+            </div>
+            <div class="skill-btn" id="btn-skill1" onclick="Engine.setMode('skill1')">
+                ✨ <div class="key-hint">3</div>
+            </div>
+            <div class="skill-btn" id="btn-endturn" onclick="Combat.endTurn()">
+                ⏳ <div class="key-hint">Sp</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * VESPER'S HOLLOW ENGINE
+ * Isometric CRPG
+ */
+
+// --- CONSTANTS ---
+const TILE_W = 64;
+const TILE_H = 32;
+const GRID_SIZE = 20;
+
+const COLORS = {
+    water: '#0a0a15',
+    waterHighlight: '#151525',
+    stoneDark: '#1a1a1a',
+    stoneLight: '#2a2a2a',
+    woodDark: '#3e2723',
+    woodLight: '#5d4037',
+    grass: '#1b2e1b',
+    highlight: 'rgba(255,255,255,0.2)',
+    danger: 'rgba(255,0,0,0.3)',
+    range: 'rgba(100,255,255,0.2)'
+};
+
+const LINEAGES = {
+    'Umbra': { icon: '🦇', desc: "Aristocratic and deadly. Masters of blood magic.", skill: "Sanguine Step" },
+    'Lycoris': { icon: '🐺', desc: "Guardians of the wild. Fierce melee combatants.", skill: "Feral Lunge" },
+    'Sirenia': { icon: '🧜‍♀️', desc: "Manipulators of emotion and water.", skill: "Siren's Call" },
+    'Oracle': { icon: '👁️', desc: "Seers of the unseen. High damage magic.", skill: "Mind Spike" },
+    'Bound': { icon: '⛓️', desc: "Reanimated scholars. Durable and resistant.", skill: "Necrotic Touch" }
+};
+
+// --- GLOBAL STATE ---
+const Game = {
+    active: false,
+    turn: 'exploration', // exploration, player, enemy
+    mode: 'move',
+    map: [],
+    entities: [],
+    particles: [],
+    camera: { x: 0, y: 0 },
+    mouse: { x: 0, y: 0, grid: {x:0, y:0} },
+    playerIdx: 0, // Current active party member index
+    party: [],
+    time: 0,
+    flags: {
+        introPlayed: false,
+        ferrymanTalked: false,
+        gateOpened: false
+    }
+};
+
+// --- ASSETS & GENERATION ---
+function generateMap() {
+    const map = [];
+    for(let y=0; y<GRID_SIZE; y++) {
+        const row = [];
+        for(let x=0; x<GRID_SIZE; x++) {
+            // Default Water
+            let type = 'water';
+            let h = 0;
+
+            // Island / Dock Shape
+            const dx = x - 10;
+            const dy = y - 10;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+
+            // Main Platform
+            if (x > 5 && x < 15 && y > 5 && y < 15) {
+                type = 'stone';
+                h = 0;
+            }
+            
+            // The Dock (Path)
+            if (x >= 15 && y >= 9 && y <= 11) {
+                type = 'wood';
+                h = 0;
+            }
+
+            // Walls/Ruins
+            if ((x===6 || x===14) && (y>5 && y<15)) {
+                if (y !== 10) type = 'wall';
+            }
+
+            row.push({ type, h, x, y, noise: Math.random() });
+        }
+        map.push(row);
+    }
+    return map;
+}
+
+// --- ENGINE CORE ---
+const Canvas = document.getElementById('canvas');
+const Ctx = Canvas.getContext('2d');
+
+const Engine = {
+    init() {
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+        Canvas.addEventListener('mousemove', e => this.handleMouseMove(e));
+        Canvas.addEventListener('mousedown', e => this.handleClick(e));
+        window.addEventListener('keydown', e => this.handleKey(e));
+
+        Game.map = generateMap();
+        
+        // Center Camera
+        Game.camera.x = window.innerWidth/2;
+        Game.camera.y = 100;
+
+        this.loop();
+    },
+
+    resize() {
+        Canvas.width = window.innerWidth;
+        Canvas.height = window.innerHeight;
+    },
+
+    handleMouseMove(e) {
+        const rect = Canvas.getBoundingClientRect();
+        Game.mouse.x = e.clientX - rect.left;
+        Game.mouse.y = e.clientY - rect.top;
+        
+        // Grid Projection
+        const adjX = Game.mouse.x - Game.camera.x;
+        const adjY = Game.mouse.y - Game.camera.y;
+        
+        const isoY = (2 * adjY - adjX * (TILE_H/(TILE_W/2))) / (2 * TILE_H);
+        const isoX = (adjX / (TILE_W/2)) + isoY;
+        
+        Game.mouse.grid = { x: Math.floor(isoX), y: Math.floor(isoY) };
+    },
+
+    handleClick(e) {
+        if (!Game.active) return;
+
+        const gx = Game.mouse.grid.x;
+        const gy = Game.mouse.grid.y;
+        
+        // Clicked UI? (Handled by DOM events usually, but blocking canvas here)
+        // ...
+
+        if (Game.turn === 'exploration' || Game.turn === 'player') {
+            const actor = Game.party[Game.playerIdx];
+            if (!actor) return;
+
+            // Check Interactions
+            const npc = Game.entities.find(en => en.x === gx && en.y === gy && en.team === 'neutral');
+            if (npc && getDist(actor, npc) <= 2) {
+                Dialogue.start(npc.id);
+                return;
+            }
+
+            if (Game.mode === 'move') {
+                // AP Check handled in move function
+                if (Game.map[gy] && Game.map[gy][gx] && Game.map[gy][gx].type !== 'water' && Game.map[gy][gx].type !== 'wall') {
+                    Combat.moveEntity(actor, gx, gy);
+                    VFX.spawnClick(gx, gy);
+                }
+            } else if (Game.mode === 'attack') {
+                const target = Game.entities.find(en => en.x === gx && en.y === gy && en.team === 'enemy');
+                if (target) Combat.attack(actor, target, 'basic');
+            } else if (Game.mode === 'skill1') {
+                // Skill Logic
+                const target = Game.entities.find(en => en.x === gx && en.y === gy);
+                Combat.useSkill(actor, target || {x:gx, y:gy});
+            }
+        }
+    },
+
+    handleKey(e) {
+        if(e.key === '1') this.setMode('move');
+        if(e.key === '2') this.setMode('attack');
+        if(e.key === '3') this.setMode('skill1');
+        if(e.key === ' ') Combat.endTurn();
+    },
+
+    setMode(mode) {
+        Game.mode = mode;
+        // UI Update
+        document.querySelectorAll('.skill-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('btn-'+mode).classList.add('active');
+    },
+
+    loop() {
+        this.update();
+        this.draw();
+        requestAnimationFrame(() => this.loop());
+    },
+
+    update() {
+        Game.time += 0.02;
+        
+        // Sort entities for rendering
+        Game.entities.sort((a,b) => a.y - b.y || a.x - b.x);
+
+        // Particle updates
+        Game.particles = Game.particles.filter(p => p.life > 0);
+        Game.particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.life--;
+        });
+        
+        // Camera Follow Active Player
+        if(Game.party[Game.playerIdx]) {
+            const p = Game.party[Game.playerIdx];
+            const targetScreen = gridToScreen(p.x, p.y);
+            // Smooth Lerp
+            // Game.camera.x += (window.innerWidth/2 - targetScreen.x) * 0.05;
+            // Game.camera.y += (window.innerHeight/2 - targetScreen.y) * 0.05;
+        }
+    },
+
+    draw() {
+        // Clear
+        Ctx.fillStyle = '#050508';
+        Ctx.fillRect(0, 0, Canvas.width, Canvas.height);
+
+        // Draw Map
+        for(let y=0; y<GRID_SIZE; y++) {
+            for(let x=0; x<GRID_SIZE; x++) {
+                const tile = Game.map[y][x];
+                const screen = gridToScreen(x, y);
+                
+                // Draw Tile
+                drawTile(Ctx, screen.x, screen.y, tile);
+
+                // Cursor Highlight
+                if (Game.mouse.grid.x === x && Game.mouse.grid.y === y) {
+                    drawIsoPoly(Ctx, screen.x, screen.y, COLORS.highlight);
+                }
+            }
+        }
+
+        // Draw Entities
+        Game.entities.forEach(ent => {
+            if (ent.hp <= 0) return;
+            const pos = gridToScreen(ent.x, ent.y);
+            drawEntity(Ctx, pos.x, pos.y, ent);
+        });
+
+        // Draw Particles
+        Game.particles.forEach(p => {
+            Ctx.fillStyle = p.color;
+            Ctx.beginPath();
+            Ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+            Ctx.fill();
+        });
+
+        // Fog Overlay
+        const grad = Ctx.createRadialGradient(
+            window.innerWidth/2, window.innerHeight/2, 200, 
+            window.innerWidth/2, window.innerHeight/2, 800
+        );
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(5,5,10,0.8)');
+        Ctx.fillStyle = grad;
+        Ctx.fillRect(0,0, Canvas.width, Canvas.height);
+    }
+};
+
+// --- RENDER HELPERS ---
+function gridToScreen(gx, gy) {
+    return {
+        x: (gx - gy) * TILE_W / 2 + Game.camera.x,
+        y: (gx + gy) * TILE_H / 2 + Game.camera.y
+    };
+}
+
+function drawTile(ctx, x, y, tile) {
+    let color = COLORS.stoneDark;
+    let topColor = COLORS.stoneLight;
+    let lift = 0;
+
+    if (tile.type === 'water') {
+        const wave = Math.sin(Game.time + tile.x + tile.y) * 2;
+        topColor = COLORS.water;
+        y += wave;
+        lift = -10; // Sunk
+    } else if (tile.type === 'wood') {
+        topColor = COLORS.woodLight;
+        color = COLORS.woodDark;
+    } else if (tile.type === 'wall') {
+        topColor = '#444';
+        lift = 40;
+    }
+
+    // Draw Sides (if lifted)
+    if (lift > 0) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, y + TILE_H);
+        ctx.lineTo(x + TILE_W/2, y + TILE_H/2);
+        ctx.lineTo(x + TILE_W/2, y + TILE_H/2 - lift);
+        ctx.lineTo(x, y + TILE_H - lift);
+        ctx.fill();
+
+        ctx.fillStyle = adjustColor(color, -20);
+        ctx.beginPath();
+        ctx.moveTo(x, y + TILE_H);
+        ctx.lineTo(x - TILE_W/2, y + TILE_H/2);
+        ctx.lineTo(x - TILE_W/2, y + TILE_H/2 - lift);
+        ctx.lineTo(x, y + TILE_H - lift);
+        ctx.fill();
+    }
+
+    // Top Face
+    ctx.fillStyle = topColor;
+    ctx.beginPath();
+    ctx.moveTo(x, y - lift);
+    ctx.lineTo(x + TILE_W/2, y + TILE_H/2 - lift);
+    ctx.lineTo(x, y + TILE_H - lift);
+    ctx.lineTo(x - TILE_W/2, y + TILE_H/2 - lift);
+    ctx.fill();
+
+    // Outline
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    // Highlight
+    if (tile.type === 'water' && Math.random() > 0.98) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(x, y, 2, 2);
+    }
+}
+
+function drawEntity(ctx, x, y, ent) {
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 10, 14, 8, 0, 0, Math.PI*2);
+    ctx.fill();
+
+    const bob = Math.sin(Game.time * 2) * 3;
+    y += bob;
+    
+    // Simple Sprite Drawing
+    let color = '#fff';
+    let icon = '?';
+
+    if (ent.team === 'player') {
+        color = varToHex('--accent-gold');
+        icon = LINEAGES[ent.lineage].icon;
+    } else if (ent.team === 'enemy') {
+        color = '#c0392b';
+        icon = '👹'; // Gargoyle
+    } else {
+        color = '#aaa';
+        icon = '💀'; // Ferryman
+    }
+
+    // Base
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y-40);
+    ctx.lineTo(x+10, y);
+    ctx.lineTo(x-10, y);
+    ctx.fill();
+
+    // Head
+    ctx.fillStyle = '#ffe0bd'; // Skin
+    if (ent.id === 'charon') ctx.fillStyle = '#555'; // Pale
+    if (ent.id === 'gargoyle') ctx.fillStyle = '#777'; // Stone
+    
+    ctx.beginPath();
+    ctx.arc(x, y-45, 10, 0, Math.PI*2);
+    ctx.fill();
+
+    // Icon/Face
+    ctx.font = "16px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(icon, x, y-60);
+
+    // Bars
+    if (ent.team !== 'neutral') {
+        const pct = ent.hp / ent.maxHp;
+        ctx.fillStyle = 'red';
+        ctx.fillRect(x-15, y-70, 30, 4);
+        ctx.fillStyle = '#0f0';
+        ctx.fillRect(x-15, y-70, 30*pct, 4);
+    }
+    
+    // Active Indicator
+    if (Game.active && Game.party[Game.playerIdx] === ent) {
+        ctx.strokeStyle = 'yellow';
+        ctx.beginPath();
+        ctx.ellipse(x, y+10, 16, 10, 0, 0, Math.PI*2);
+        ctx.stroke();
+    }
+}
+
+function drawIsoPoly(ctx, x, y, color) {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + TILE_W/2, y + TILE_H/2);
+    ctx.lineTo(x, y + TILE_H);
+    ctx.lineTo(x - TILE_W/2, y + TILE_H/2);
+    ctx.fill();
+}
+
+// --- GAME LOGIC ---
+const Combat = {
+    moveEntity(ent, x, y) {
+        if (getDist(ent, {x,y}) > ent.ap + 3) {
+            UI.log("Too far!", 'error');
+            return;
+        }
+        
+        ent.x = x;
+        ent.y = y;
+        
+        if (Game.turn === 'player') {
+            ent.ap -= 1;
+            if (ent.ap <= 0) ent.ap = 0;
+            UI.updatePartyFrames();
+        }
+    },
+
+    attack(attacker, target, type) {
+        if (attacker.ap <= 0) { UI.log("No AP!", 'error'); return; }
+        if (getDist(attacker, target) > 1.5) { UI.log("Too far to strike!", 'error'); return; }
+
+        let dmg = 10 + Math.floor(Math.random() * 5);
+        target.hp -= dmg;
+        VFX.spawnText(target.x, target.y, `-${dmg}`, 'red');
+        UI.log(`${attacker.name} hits ${target.name} for ${dmg}.`);
+        attacker.ap--;
+        
+        if (target.hp <= 0) {
+            target.x = -100; // Remove from map
+            UI.log(`${target.name} defeated.`);
+            if (target.id === 'gargoyle') {
+                Dialogue.start('end_combat');
+            }
+        }
+        UI.updatePartyFrames();
+    },
+
+    useSkill(attacker, target) {
+        if (attacker.ap < 2) { UI.log("Need 2 AP!", 'error'); return; }
+
+        // Placeholder Skill Logic
+        let dmg = 20;
+        if (attacker.lineage === 'Umbra') {
+            // Teleport
+            attacker.x = target.x; attacker.y = target.y;
+            VFX.spawnText(attacker.x, attacker.y, "Blink", '#a0f');
+            dmg = 0;
+        } else {
+             // Generic Blast
+             const tEnt = Game.entities.find(e => e.x === target.x && e.y === target.y);
+             if(tEnt) {
+                 tEnt.hp -= dmg;
+                 VFX.spawnText(tEnt.x, tEnt.y, `-${dmg}`, '#a0f');
+             }
+        }
+        attacker.ap -= 2;
+        UI.updatePartyFrames();
+    },
+
+    endTurn() {
+        if (Game.turn === 'player') {
+            Game.turn = 'enemy';
+            UI.log("Enemy Turn...");
+            setTimeout(Combat.enemyTurn, 1000);
+        }
+    },
+
+    enemyTurn() {
+        const enemies = Game.entities.filter(e => e.team === 'enemy' && e.hp > 0);
+        enemies.forEach(en => {
+            // Simple AI: Move to closest player
+            const target = Game.party[0]; // Simplified
+            if(getDist(en, target) > 1.5) {
+                if (en.x < target.x) en.x++;
+                else if (en.x > target.x) en.x--;
+            } else {
+                target.hp -= 5;
+                VFX.spawnText(target.x, target.y, "-5", 'red');
+            }
+        });
+        
+        Game.turn = 'player';
+        Game.party.forEach(p => p.ap = p.maxAp);
+        UI.log("Player Turn.");
+        UI.updatePartyFrames();
+    }
+};
+
+const Dialogue = {
+    data: {
+        'charon': {
+            start: {
+                speaker: 'Charon',
+                text: "The toll is heavy for the living. Why do you seek the Hollow?",
+                options: [
+                    { text: "I have an invitation.", next: 'invite' },
+                    { text: "[Umbra] Do not trifle with me, Ferryman.", next: 'threat', req: 'Umbra' },
+                    { text: "[Bound] I am not fully living.", next: 'kin', req: 'Bound' }
+                ]
+            },
+            invite: {
+                speaker: 'Charon',
+                text: "Many have invitations. Few have the soul to endure the crossing. Very well. Prepare yourself.",
+                options: [{ text: "Board the ferry.", action: 'start_event' }]
+            },
+            threat: {
+                speaker: 'Charon',
+                text: "Hmph. The arrogance of the Sanguine. Fine. Step aboard, little prince.",
+                options: [{ text: "Board.", action: 'start_event' }]
+            },
+            kin: {
+                speaker: 'Charon',
+                text: "Ah... one who has touched the other side. You may pass without toll.",
+                options: [{ text: "Board.", action: 'start_event' }]
+            }
+        },
+        'valerius': {
+            start: {
+                speaker: 'Valerius',
+                text: "About time. I expected the new 'Prism' to be... taller. Look out!",
+                options: [{ text: "What?", action: 'spawn_gargoyle' }]
+            }
+        },
+        'end_combat': {
+            start: {
+                speaker: 'Valerius',
+                text: "Not bad. You didn't die instantly. Welcome to Vesper's Hollow.",
+                options: [{ text: "End Chapter I", action: 'finish_game' }]
+            }
+        }
+    },
+
+    start(id) {
+        const node = this.data[id].start;
+        this.render(node, id);
+        document.getElementById('dialogue-box').style.display = 'block';
+    },
+
+    render(node, id) {
+        document.getElementById('diag-speaker').innerText = node.speaker;
+        document.getElementById('diag-text').innerText = node.text;
+        
+        const optsDiv = document.getElementById('diag-options');
+        optsDiv.innerHTML = '';
+
+        node.options.forEach(opt => {
+            // Req check
+            if (opt.req && Game.party[0].lineage !== opt.req) return;
+
+            const btn = document.createElement('div');
+            btn.className = 'dialogue-btn';
+            
+            // Tag styling
+            let tag = '';
+            if (opt.req) tag = `<span class="tag-${opt.req.toLowerCase()}">[${opt.req}]</span> `;
+            
+            btn.innerHTML = tag + opt.text;
+            btn.onclick = () => {
+                if (opt.action) this.doAction(opt.action);
+                else if (opt.next) this.render(this.data[id][opt.next], id);
+                else this.close();
+            };
+            optsDiv.appendChild(btn);
+        });
+    },
+
+    doAction(act) {
+        this.close();
+        if (act === 'start_event') {
+            // Teleport to Gates
+            UI.log("The Ferry crosses the misty waters...");
+            setTimeout(() => {
+                Game.camera.x -= 200; // Pan
+                // Spawn Valerius
+                const val = { id: 'valerius', name: 'Valerius', lineage: 'Umbra', hp: 80, maxHp: 80, ap: 3, maxAp: 3, x: 10, y: 10, team: 'player' };
+                Game.party.push(val);
+                Game.entities.push(val);
+                UI.updatePartyFrames();
+                Dialogue.start('valerius');
+            }, 1000);
+        }
+        if (act === 'spawn_gargoyle') {
+            const boss = { id: 'gargoyle', name: 'Gargoyle', lineage: 'Bound', hp: 60, maxHp: 60, ap: 2, maxAp: 2, x: 14, y: 10, team: 'enemy' };
+            Game.entities.push(boss);
+            UI.log("Combat Started!");
+            Game.turn = 'player';
+        }
+        if (act === 'finish_game') {
+            alert("Chapter 1 Complete. Welcome to the Sanctuary.");
+        }
+    },
+
+    close() {
+        document.getElementById('dialogue-box').style.display = 'none';
+    }
+};
+
+const UI = {
+    log(msg, type='info') {
+        const log = document.getElementById('combat-log');
+        const div = document.createElement('div');
+        div.className = 'log-msg';
+        div.innerText = `> ${msg}`;
+        if (type==='error') div.style.color = '#c0392b';
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+    },
+
+    updatePartyFrames() {
+        const con = document.getElementById('party-frames');
+        con.innerHTML = '';
+        
+        Game.party.forEach((p, idx) => {
+            const div = document.createElement('div');
+            div.className = `char-frame ${Game.playerIdx === idx ? 'active' : ''}`;
+            div.onclick = () => { Game.playerIdx = idx; UI.updatePartyFrames(); };
+            
+            let pips = '';
+            for(let i=0; i<p.maxAp; i++) pips += `<div class="ap-pip ${i < p.ap ? 'filled' : ''}"></div>`;
+
+            div.innerHTML = `
+                <div class="char-portrait">${LINEAGES[p.lineage].icon}</div>
+                <div class="char-details">
+                    <div class="char-name">${p.name}</div>
+                    <div class="bar-container"><div class="hp-fill" style="width:${(p.hp/p.maxHp)*100}%"></div></div>
+                    <div class="ap-pips">${pips}</div>
+                </div>
+            `;
+            con.appendChild(div);
+        });
+    }
+};
+
+const VFX = {
+    spawnClick(x, y) {
+        const s = gridToScreen(x, y);
+        Game.particles.push({ x: s.x, y: s.y, vx: 0, vy: -1, life: 20, size: 5, color: 'rgba(255,255,255,0.5)' });
+    },
+    spawnText(x, y, text, color) {
+        // Simple visual hack: Draw text in draw loop would be better, but console logging is safer for this prototype complexity
+    }
+};
+
+// --- INIT HELPERS ---
+function selectLineage(l) {
+    document.querySelectorAll('.race-btn').forEach(b => b.classList.remove('selected'));
+    // In real app, bind click target properly. Hack for prototype:
+    event.currentTarget.classList.add('selected');
+    
+    document.getElementById('lore-title').innerText = l;
+    document.getElementById('lore-preview').innerHTML = LINEAGES[l].desc + `<br><br><strong>Ability:</strong> ${LINEAGES[l].skill}`;
+    
+    // Store temp selection
+    window.selectedLineage = l;
+}
+
+function startGame() {
+    const name = document.getElementById('inp-name').value;
+    const lin = window.selectedLineage || 'Umbra';
+    
+    const hero = {
+        id: 'hero',
+        name: name,
+        lineage: lin,
+        hp: 100, maxHp: 100,
+        ap: 3, maxAp: 3,
+        x: 18, y: 10,
+        team: 'player'
+    };
+    
+    Game.party.push(hero);
+    Game.entities.push(hero);
+    
+    // Spawn Charon
+    Game.entities.push({
+        id: 'charon', name: 'Charon', lineage: 'Bound', hp: 1000, maxHp: 1000, ap: 0, maxAp: 0, x: 15, y: 10, team: 'neutral'
+    });
+
+    document.getElementById('screen-creation').classList.add('hidden');
+    document.getElementById('ui-layer').classList.remove('hidden');
+    
+    Game.active = true;
+    UI.updatePartyFrames();
+    UI.log("Welcome to the Crossing.");
+    Engine.init();
+}
+
+function adjustColor(col, amt) { return col; } // Placeholder
+function getDist(a, b) { return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2); }
+function varToHex(v) { return '#c5a059'; } // Placeholder
+
+</script>
+</body>
+</html>
