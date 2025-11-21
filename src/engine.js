@@ -91,6 +91,17 @@ const Engine = {
             const actor = Game.party[Game.playerIdx];
             if (!actor) return;
 
+            // Check Loot
+            const lootIdx = Game.loot.findIndex(l => l.x === gx && l.y === gy);
+            if (lootIdx !== -1 && getDist(actor, {x:gx, y:gy}) <= 1.5) {
+                const loot = Game.loot[lootIdx];
+                actor.inventory.push(loot.item);
+                Game.loot.splice(lootIdx, 1);
+                UI.log(`Picked up ${ITEMS[loot.item].name}.`, 'success');
+                VFX.spawnText(gx, gy, `+${ITEMS[loot.item].icon}`, 'gold');
+                return;
+            }
+
             // Check Interactions
             const npc = Game.entities.find(en => en.x === gx && en.y === gy && en.team === 'neutral');
             if (npc && getDist(actor, npc) <= 2) {
@@ -102,15 +113,17 @@ const Engine = {
                 // AP Check handled in move function
                 if (Game.map[gy] && Game.map[gy][gx] && Game.map[gy][gx].type !== 'water' && Game.map[gy][gx].type !== 'wall') {
                     Combat.moveEntity(actor, gx, gy);
-                    VFX.spawnClick(gx, gy);
                 }
             } else if (Game.mode === 'attack') {
                 const target = Game.entities.find(en => en.x === gx && en.y === gy && en.team === 'enemy');
                 if (target) Combat.attack(actor, target, 'basic');
-            } else if (Game.mode === 'skill1') {
-                // Skill Logic
-                const target = Game.entities.find(en => en.x === gx && en.y === gy);
-                Combat.useSkill(actor, target || {x:gx, y:gy});
+            } else {
+                // Skill Mode
+                // Check if current mode is a known skill
+                if (SKILLS[Game.mode]) {
+                    const target = Game.entities.find(en => en.x === gx && en.y === gy);
+                    Combat.useSkill(actor, Game.mode, target || {x:gx, y:gy});
+                }
             }
         }
     },
@@ -180,6 +193,21 @@ const Engine = {
                 }
             }
         }
+
+        // Draw Loot
+        Game.loot.forEach(l => {
+            const pos = gridToScreen(l.x, l.y);
+            Ctx.fillStyle = 'yellow';
+            Ctx.font = "20px Arial";
+            Ctx.textAlign = "center";
+            const item = ITEMS[l.item];
+            Ctx.fillText(item.icon, pos.x, pos.y - 10);
+
+            // Glow
+            Ctx.shadowBlur = 10;
+            Ctx.shadowColor = "gold";
+            Ctx.shadowBlur = 0;
+        });
 
         // Draw Entities
         Game.entities.forEach(ent => {

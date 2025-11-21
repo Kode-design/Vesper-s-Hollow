@@ -50,45 +50,88 @@ const Combat = {
         UI.updatePartyFrames();
     },
 
-    useSkill(attacker, target) {
-        const skillId = 'skill1'; // Hardcoded for now
+    useSkill(attacker, skillId, targetPos) {
+        const skill = SKILLS[skillId];
+        if (!skill) return;
+
+        // Checks
+        if (attacker.ap < skill.ap) {
+            UI.log(`Need ${skill.ap} AP!`, 'error');
+            return;
+        }
         if (attacker.cooldowns && attacker.cooldowns[skillId] > 0) {
             UI.log(`Skill on cooldown! (${attacker.cooldowns[skillId]} turns)`, 'error');
             return;
         }
-        if (attacker.ap < 2) { UI.log("Need 2 AP!", 'error'); return; }
+        if (getDist(attacker, targetPos) > skill.range) {
+            UI.log("Out of range!", 'error');
+            return;
+        }
 
-        let dmg = 20;
+        // Apply Cost
+        attacker.ap -= skill.ap;
 
         // Initialize cooldowns if missing
         if(!attacker.cooldowns) attacker.cooldowns = {};
-        attacker.cooldowns[skillId] = 3; // 3 turn CD
+        attacker.cooldowns[skillId] = skill.cooldown;
 
-        if (attacker.lineage === 'Umbra') {
-            // Teleport
-            attacker.x = target.x; attacker.y = target.y;
+        // Logic
+        let tEnt = Game.entities.find(e => e.x === targetPos.x && e.y === targetPos.y);
+
+        if (skill.type === 'teleport') {
+            attacker.x = targetPos.x;
+            attacker.y = targetPos.y;
             VFX.spawnText(attacker.x, attacker.y, "Blink", '#a0f');
-            dmg = 0;
-        } else if (attacker.lineage === 'Lycoris') {
-            // Bleed Attack
-            const tEnt = Game.entities.find(e => e.x === target.x && e.y === target.y);
-            if(tEnt) {
-                tEnt.hp -= 15;
-                // Add bleed effect
-                if(!tEnt.effects) tEnt.effects = [];
-                tEnt.effects.push({type: 'bleed', duration: 3, val: 5});
-                VFX.spawnText(tEnt.x, tEnt.y, `-15 (Bleed)`, 'red');
+        }
+        else if (skill.type === 'heal') {
+            if (tEnt) {
+                tEnt.hp = Math.min(tEnt.hp + skill.val, tEnt.maxHp);
+                VFX.spawnText(tEnt.x, tEnt.y, `+${skill.val}`, 'green');
             }
-        } else {
-             // Generic Blast
-             const tEnt = Game.entities.find(e => e.x === target.x && e.y === target.y);
-             if(tEnt) {
+        }
+        else {
+             // Damage / Status
+             if (tEnt) {
+                 let dmg = skill.val;
                  tEnt.hp -= dmg;
-                 VFX.spawnText(tEnt.x, tEnt.y, `-${dmg}`, '#a0f');
+                 VFX.spawnText(tEnt.x, tEnt.y, `-${dmg}`, 'red');
+
+                 if (skill.type === 'status' && skill.status) {
+                     if(!tEnt.effects) tEnt.effects = [];
+                     tEnt.effects.push({type: skill.status, duration: skill.statusDur, val: skill.statusVal});
+                     UI.log(`${tEnt.name} is affected by ${skill.status}!`);
+                 }
+                 if (skill.type === 'drain') {
+                     attacker.hp = Math.min(attacker.hp + skill.val, attacker.maxHp);
+                     VFX.spawnText(attacker.x, attacker.y, `+${skill.val}`, 'green');
+                 }
+
+                 if (tEnt.hp <= 0) {
+                     tEnt.x = -100;
+                     UI.log(`${tEnt.name} defeated.`);
+                     Combat.handleDeath(tEnt);
+                 }
+             } else {
+                 UI.log("Missed!", 'info');
              }
         }
-        attacker.ap -= 2;
+
         UI.updatePartyFrames();
+    },
+
+    handleDeath(ent) {
+        // Drop Loot
+        if (ent.team === 'enemy') {
+            // Simple chance
+            if (Math.random() > 0.5) {
+                const item = 'potion_hp';
+                Game.loot.push({x: ent.x, y: ent.y, item: item});
+                UI.log(`${ent.name} dropped ${ITEMS[item].name}.`);
+            }
+        }
+
+        // Check Win/Loss
+        GameLoop.checkGameState();
     },
 
     endTurn() {
@@ -157,6 +200,9 @@ const Combat = {
             } else {
                 target.hp -= 5;
                 VFX.spawnText(target.x, target.y, "-5", 'red');
+                if (target.hp <= 0) {
+                    GameLoop.checkGameState(); // Player might have died
+                }
             }
         });
 

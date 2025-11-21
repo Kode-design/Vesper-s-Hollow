@@ -105,7 +105,7 @@ const Dialogue = {
             Game.turn = 'player';
         }
         if (act === 'finish_game') {
-            alert("Chapter 1 Complete. Welcome to the Sanctuary.");
+            GameLoop.triggerVictory();
         }
     },
 

@@ -10,6 +10,7 @@ const Game = {
     mouse: { x: 0, y: 0, grid: {x:0, y:0} },
     playerIdx: 0, // Current active party member index
     party: [],
+    loot: [], // Array of {x, y, item}
     time: 0,
     flags: {
         introPlayed: false,

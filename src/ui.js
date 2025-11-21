@@ -16,7 +16,11 @@ const UI = {
         Game.party.forEach((p, idx) => {
             const div = document.createElement('div');
             div.className = `char-frame ${Game.playerIdx === idx ? 'active' : ''}`;
-            div.onclick = () => { Game.playerIdx = idx; UI.updatePartyFrames(); };
+            div.onclick = () => {
+                Game.playerIdx = idx;
+                UI.updatePartyFrames();
+                UI.updateActionBar();
+            };
 
             let pips = '';
             for(let i=0; i<p.maxAp; i++) pips += `<div class="ap-pip ${i < p.ap ? 'filled' : ''}"></div>`;
@@ -31,5 +35,41 @@ const UI = {
             `;
             con.appendChild(div);
         });
+        this.updateActionBar();
+    },
+
+    updateActionBar() {
+        const actor = Game.party[Game.playerIdx];
+        if (!actor) return;
+
+        // We have slots for skills. 1 is Move, 2 is Attack. 3+ are skills.
+        // But for now, let's just repurpose "btn-skill1"
+        const skillBtn = document.getElementById('btn-skill1');
+        const skillId = LINEAGES[actor.lineage].skills[0]; // Use first skill for now
+        const skillData = SKILLS[skillId];
+
+        if (skillData) {
+            skillBtn.innerHTML = `${skillData.icon} <div class="key-hint">3</div>`;
+
+            // IMPORTANT: We must set the onclick to call Engine.setMode with the SPECIFIC skillId
+            // The previous issue was likely that the Engine.setMode was not updating the Game.mode correctly
+            // or the UI update wasn't reflecting it immediately.
+
+            skillBtn.onclick = () => {
+                Engine.setMode(skillId);
+                // Force UI update to show active state immediately
+                UI.updateActionBar();
+            };
+
+            skillBtn.title = `${skillData.name}: ${skillData.desc} (${skillData.ap} AP)`;
+
+            // Update active state visual
+            if (Game.mode === skillId) skillBtn.classList.add('active');
+            else skillBtn.classList.remove('active');
+        }
+
+        // Update Move/Attack active state
+        document.getElementById('btn-move').classList.toggle('active', Game.mode === 'move');
+        document.getElementById('btn-attack').classList.toggle('active', Game.mode === 'attack');
     }
 };
