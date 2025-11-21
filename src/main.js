@@ -25,7 +25,9 @@ function startGame() {
         ap: 3, maxAp: 3,
         x: 18, y: 10,
         team: 'player',
-        inventory: ['potion_hp', 'potion_hp', 'potion_ap']
+        inventory: ['potion_hp', 'potion_hp', 'potion_ap'],
+        effects: [],
+        cooldowns: {}
     };
 
     Game.party.push(hero);

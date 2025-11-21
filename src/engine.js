@@ -202,15 +202,49 @@ const Engine = {
             }
         });
 
-        // Fog Overlay
-        const grad = Ctx.createRadialGradient(
-            window.innerWidth/2, window.innerHeight/2, 200,
-            window.innerWidth/2, window.innerHeight/2, 800
-        );
-        grad.addColorStop(0, 'rgba(0,0,0,0)');
-        grad.addColorStop(1, 'rgba(5,5,10,0.8)');
-        Ctx.fillStyle = grad;
-        Ctx.fillRect(0,0, Canvas.width, Canvas.height);
+        // Visualize Path
+        if (Game.mode === 'move' && Game.turn === 'player') {
+            const actor = Game.party[Game.playerIdx];
+            if (actor) {
+                const path = Pathfinding.findPath(actor, Game.mouse.grid, Game.map);
+                if (path) {
+                    path.forEach(node => {
+                        const sc = gridToScreen(node.x, node.y);
+                        drawIsoPoly(Ctx, sc.x, sc.y, 'rgba(0,255,0,0.2)');
+                    });
+                }
+            }
+        }
+
+        // Dynamic Lighting / Fog
+        // Create a dark overlay mask
+        // We want to punch holes where light sources are.
+        // Since composite operations can be tricky with single layer, we do a simple trick:
+        // Fill dark, then use 'destination-out' gradient for lights? No, that clears to transparent.
+        // We want to clear the fog (which is black with alpha).
+
+        Ctx.save();
+        // Draw Fog
+        // We use a temporary canvas or just draw directly if simple
+        // Let's stick to the gradient method but make it centered on player
+        const p = Game.party[Game.playerIdx];
+        if (p) {
+             const ps = gridToScreen(p.x, p.y);
+             const grad = Ctx.createRadialGradient(
+                ps.x, ps.y - 40, 150,
+                ps.x, ps.y - 40, 600
+            );
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.6, 'rgba(5,5,10,0.5)');
+            grad.addColorStop(1, 'rgba(5,5,10,0.95)');
+            Ctx.fillStyle = grad;
+            Ctx.fillRect(0,0, Canvas.width, Canvas.height);
+        } else {
+             // Fallback
+             Ctx.fillStyle = 'rgba(0,0,0,0.8)';
+             Ctx.fillRect(0,0, Canvas.width, Canvas.height);
+        }
+        Ctx.restore();
     }
 };
 
@@ -267,6 +301,19 @@ function drawTile(ctx, x, y, tile) {
     ctx.lineTo(x, y + TILE_H - lift);
     ctx.lineTo(x - TILE_W/2, y + TILE_H/2 - lift);
     ctx.fill();
+
+    // Texture Detail (Simple noise)
+    if (tile.type === 'stone') {
+        ctx.fillStyle = 'rgba(0,0,0,0.1)';
+        if (tile.noise > 0.7) ctx.fillRect(x, y - lift + 10, 4, 4);
+        if (tile.noise < 0.3) ctx.fillRect(x-10, y - lift + 5, 3, 3);
+    } else if (tile.type === 'wood') {
+         ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+         ctx.beginPath();
+         ctx.moveTo(x - 10, y - lift + 5);
+         ctx.lineTo(x + 10, y - lift + 15);
+         ctx.stroke();
+    }
 
     // Outline
     ctx.strokeStyle = 'rgba(0,0,0,0.3)';

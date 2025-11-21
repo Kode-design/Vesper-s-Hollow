@@ -86,6 +86,10 @@
             <div style="text-align: right;">
                 <div style="font-family: var(--font-header); color: #888; font-size: 14px;">LOCATION</div>
                 <div style="font-family: var(--font-header); color: var(--accent-gold); font-size: 24px;" id="location-text">The Ferry Docks</div>
+                <div style="margin-top:10px;">
+                    <button onclick="Storage.saveGame()" style="background:#333; border:1px solid #555; color:#ccc; cursor:pointer; padding:5px;">Save</button>
+                    <button onclick="Storage.loadGame()" style="background:#333; border:1px solid #555; color:#ccc; cursor:pointer; padding:5px;">Load</button>
+                </div>
             </div>
         </div>
 
@@ -132,6 +136,8 @@
 <script src="src/data.js"></script>
 <script src="src/inventory.js"></script>
 <script src="src/game.js"></script>
+<script src="src/storage.js"></script>
+<script src="src/pathfinding.js"></script>
 <script src="src/ui.js"></script>
 <script src="src/vfx.js"></script>
 <script src="src/dialogue.js"></script>

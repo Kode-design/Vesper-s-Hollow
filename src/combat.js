@@ -1,16 +1,31 @@
 const Combat = {
     moveEntity(ent, x, y) {
-        if (getDist(ent, {x,y}) > ent.ap + 3) {
-            UI.log("Too far!", 'error');
+        if (ent.ap <= 0 && Game.turn === 'player') {
+            UI.log("No AP to move!", 'error');
             return;
         }
 
+        // Use A*
+        const path = Pathfinding.findPath(ent, {x, y}, Game.map);
+        if (!path) {
+            UI.log("Path blocked or unreachable.", 'error');
+            return;
+        }
+
+        const cost = path.length - 1; // Path includes start
+        if (cost > ent.ap && Game.turn === 'player') {
+            UI.log(`Too far! Need ${cost} AP.`, 'error');
+            return;
+        }
+
+        // Animate Movement (instant for now, but loop points)
+        // In a full engine, we'd tween through path.
         ent.x = x;
         ent.y = y;
 
         if (Game.turn === 'player') {
-            ent.ap -= 1;
-            if (ent.ap <= 0) ent.ap = 0;
+            ent.ap -= cost;
+            UI.log(`${ent.name} moved (${cost} AP).`);
             UI.updatePartyFrames();
         }
     },
@@ -36,15 +51,34 @@ const Combat = {
     },
 
     useSkill(attacker, target) {
+        const skillId = 'skill1'; // Hardcoded for now
+        if (attacker.cooldowns && attacker.cooldowns[skillId] > 0) {
+            UI.log(`Skill on cooldown! (${attacker.cooldowns[skillId]} turns)`, 'error');
+            return;
+        }
         if (attacker.ap < 2) { UI.log("Need 2 AP!", 'error'); return; }
 
-        // Placeholder Skill Logic
         let dmg = 20;
+
+        // Initialize cooldowns if missing
+        if(!attacker.cooldowns) attacker.cooldowns = {};
+        attacker.cooldowns[skillId] = 3; // 3 turn CD
+
         if (attacker.lineage === 'Umbra') {
             // Teleport
             attacker.x = target.x; attacker.y = target.y;
             VFX.spawnText(attacker.x, attacker.y, "Blink", '#a0f');
             dmg = 0;
+        } else if (attacker.lineage === 'Lycoris') {
+            // Bleed Attack
+            const tEnt = Game.entities.find(e => e.x === target.x && e.y === target.y);
+            if(tEnt) {
+                tEnt.hp -= 15;
+                // Add bleed effect
+                if(!tEnt.effects) tEnt.effects = [];
+                tEnt.effects.push({type: 'bleed', duration: 3, val: 5});
+                VFX.spawnText(tEnt.x, tEnt.y, `-15 (Bleed)`, 'red');
+            }
         } else {
              // Generic Blast
              const tEnt = Game.entities.find(e => e.x === target.x && e.y === target.y);
@@ -59,20 +93,67 @@ const Combat = {
 
     endTurn() {
         if (Game.turn === 'player') {
+            // Process Player Effects (end of turn)
+            this.processEffects(Game.party);
+
             Game.turn = 'enemy';
             UI.log("Enemy Turn...");
             setTimeout(Combat.enemyTurn, 1000);
         }
     },
 
+    processEffects(entities) {
+        entities.forEach(ent => {
+            if(!ent.effects) return;
+            ent.effects = ent.effects.filter(eff => {
+                if(eff.type === 'bleed') {
+                    ent.hp -= eff.val;
+                    VFX.spawnText(ent.x, ent.y, `-${eff.val}`, 'red');
+                    UI.log(`${ent.name} bleeds for ${eff.val}.`);
+                }
+                eff.duration--;
+                return eff.duration > 0;
+            });
+
+            // Cooldowns
+            if(ent.cooldowns) {
+                for(let k in ent.cooldowns) {
+                    if(ent.cooldowns[k] > 0) ent.cooldowns[k]--;
+                }
+            }
+        });
+        UI.updatePartyFrames(); // Update HP bars if bleed happened
+    },
+
     enemyTurn() {
         const enemies = Game.entities.filter(e => e.team === 'enemy' && e.hp > 0);
+
+        // Process Enemy Effects (start of their turn)
+        this.processEffects(enemies);
+
         enemies.forEach(en => {
+            if (en.hp <= 0) return; // Died from bleed?
+
             // Simple AI: Move to closest player
-            const target = Game.party[0]; // Simplified
-            if(getDist(en, target) > 1.5) {
-                if (en.x < target.x) en.x++;
-                else if (en.x > target.x) en.x--;
+            const target = Game.party[0];
+            const dist = getDist(en, target);
+
+            if(dist > 1.5) {
+                // Try to move closer with A*
+                // Find a tile adjacent to target?
+                // For now, just path to target tile, but stop before it.
+                const path = Pathfinding.findPath(en, {x: target.x, y: target.y}, Game.map);
+                if (path && path.length > 2) {
+                    // Move towards
+                    const next = path[1]; // 0 is current, 1 is next step
+                    // Simply move one step per turn for this basic AI
+                    en.x = next.x;
+                    en.y = next.y;
+                } else if (!path) {
+                   // Fallback simple move
+                    if (en.x < target.x) en.x++;
+                    else if (en.x > target.x) en.x--;
+                }
             } else {
                 target.hp -= 5;
                 VFX.spawnText(target.x, target.y, "-5", 'red');
@@ -80,7 +161,22 @@ const Combat = {
         });
 
         Game.turn = 'player';
-        Game.party.forEach(p => p.ap = p.maxAp);
+        // Process Player Cooldowns tick? Usually at start of their turn
+        // Let's do it in endTurn of previous or here.
+        // We did player end-turn processing.
+
+        // Restore AP
+        Game.party.forEach(p => {
+             p.ap = p.maxAp;
+             // Cooldowns can also tick here for player if we prefer "start of turn" refresh
+             if(p.cooldowns) {
+                 for(let k in p.cooldowns) {
+                     // if(p.cooldowns[k] > 0) p.cooldowns[k]--;
+                     // Already did it in endTurn processEffects for simplicity
+                 }
+             }
+        });
+
         UI.log("Player Turn.");
         UI.updatePartyFrames();
     }
