@@ -93,13 +93,18 @@ const Engine = {
 
             // Check Loot
             const lootIdx = Game.loot.findIndex(l => l.x === gx && l.y === gy);
-            if (lootIdx !== -1 && getDist(actor, {x:gx, y:gy}) <= 1.5) {
-                const loot = Game.loot[lootIdx];
-                actor.inventory.push(loot.item);
-                Game.loot.splice(lootIdx, 1);
-                UI.log(`Picked up ${ITEMS[loot.item].name}.`, 'success');
-                VFX.spawnText(gx, gy, `+${ITEMS[loot.item].icon}`, 'gold');
-                return;
+            if (lootIdx !== -1) {
+                 if (getDist(actor, {x:gx, y:gy}) <= 1.5) {
+                    const loot = Game.loot[lootIdx];
+                    actor.inventory.push(loot.item);
+                    Game.loot.splice(lootIdx, 1);
+                    UI.log(`Picked up ${ITEMS[loot.item].name}.`, 'success');
+                    VFX.spawnText(gx, gy, `+${ITEMS[loot.item].icon}`, 'gold');
+                    return;
+                 } else {
+                     // Move to loot if far?
+                     // Optional: auto-move
+                 }
             }
 
             // Check Interactions
